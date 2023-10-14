@@ -6,7 +6,7 @@ redis==3.2.1
 """
 import os
 import logging
-import redis
+from redis import Redis
 from environs import Env
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -30,20 +30,16 @@ def start(update, context):
     Бот отвечает пользователю фразой "Привет!" и переводит его в состояние ECHO.
     Теперь в ответ на его команды будет запускаеться хэндлер echo.
     """
+    keyboard = []
+    for key in range(3):
+        keyboard.append([InlineKeyboardButton(f'Option {key}', callback_data=f'{key}')])
 
 
-    keyboard = [
-        [
-            InlineKeyboardButton("Option 1", callback_data='1'),
-            InlineKeyboardButton("Option 2", callback_data='2'),
-        ],
-        [InlineKeyboardButton("Option 3", callback_data='3')],
-    ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     update.message.reply_text('Please choose:', reply_markup=reply_markup)
-    return "ECHO"
+    return 'ECHO'
 
 
 def echo(update, context):
@@ -58,8 +54,8 @@ def echo(update, context):
     query = update.callback_query
     query.answer()
 
-    query.edit_message_text(text=f"Selected option: {query.data}")
-    return "ECHO"
+    query.edit_message_text(text=f'Selected option: {query.data}')
+    return 'ECHO'
 
 
 def handle_users_reply(update, context):
@@ -109,16 +105,16 @@ def get_database_connection():
     """
     global _database
     if _database is None:
-        database_host = os.getenv("DATABASE_HOST")
-        database_port = os.getenv("DATABASE_PORT")
-        _database = redis.Redis(host=database_host, port=database_port, decode_responses=True)
+        database_host = os.getenv('DATABASE_HOST')
+        database_port = os.getenv('DATABASE_PORT')
+        _database = Redis(host=database_host, port=database_port, decode_responses=True)
     return _database
 
 
 if __name__ == '__main__':
     env = Env()
     env.read_env()
-    tg_token = env.str("TELEGRAM_TOKEN")
+    tg_token = env.str('TELEGRAM_TOKEN')
     updater = Updater(tg_token)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
