@@ -10,9 +10,9 @@ def get_strapi_api(link, strapi_token):
     #url = urlparse(link)
     response = requests.get(link, headers=payload)
     response.raise_for_status()
-    print(response.text)
-    message = response.json
-    print(message)
+    pprint(response.json())
+    message = response.json()
+    pprint(message)
 
 
 

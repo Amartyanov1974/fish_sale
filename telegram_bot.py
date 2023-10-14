@@ -6,8 +6,10 @@ redis==3.2.1
 """
 import os
 import logging
+import requests
 from redis import Redis
 from environs import Env
+
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Filters, Updater
@@ -23,6 +25,18 @@ logger = logging.getLogger(__name__)
 
 _database = None
 
+
+
+def get_strapi_api():
+    strapi_token = os.getenv('API_TOKEN_FISH')
+    url = 'http://localhost:1337/api/products'
+    payload = {'Authorization': f'bearer {strapi_token}'}
+    response = requests.get(url, headers=payload)
+    response.raise_for_status()
+    return response.json()['data']
+
+
+
 def start(update, context):
     """
     Хэндлер для состояния START.
@@ -31,8 +45,14 @@ def start(update, context):
     Теперь в ответ на его команды будет запускаеться хэндлер echo.
     """
     keyboard = []
-    for key in range(3):
-        keyboard.append([InlineKeyboardButton(f'Option {key}', callback_data=f'{key}')])
+
+    for position in get_strapi_api():
+        fish_attributes = position['attributes']
+        fish_title = fish_attributes['title']
+        fish_description = fish_attributes['description']
+        print(fish_title, fish_description)
+
+        keyboard.append([InlineKeyboardButton(fish_title, callback_data=position['id'])])
 
 
 
@@ -52,9 +72,8 @@ def echo(update, context):
     #users_reply = update.message.text
     #update.message.reply_text(users_reply)
     query = update.callback_query
-    query.answer()
-
-    query.edit_message_text(text=f'Selected option: {query.data}')
+    text = query.data
+    query.edit_message_text(text=text)
     return 'ECHO'
 
 
