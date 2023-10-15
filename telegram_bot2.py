@@ -9,18 +9,11 @@ import logging
 import requests
 from redis import Redis
 from environs import Env
+from functools import partial
 
-
-from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    )
-from telegram.ext import (
-    Filters, Updater,
-    CallbackQueryHandler,
-    CommandHandler,
-    MessageHandler,
-    )
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Filters, Updater
+from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
 
 logging.basicConfig(
@@ -29,8 +22,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-_database = None
 
 
 def get_products():
@@ -44,7 +35,7 @@ def get_products():
 
 def get_product(product_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/products/{product_id}'
+    url = 'http://localhost:1337/api/products/{product_id}'
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, headers=payload)
     response.raise_for_status()
@@ -58,13 +49,20 @@ def start(update, context):
     Бот отвечает пользователю фразой "Привет!" и переводит его в состояние ECHO.
     Теперь в ответ на его команды будет запускаеться хэндлер echo.
     """
+    query = update.callback_query
+    text = query.data
+    query.edit_message_text(text=text)
     keyboard = []
 
     for position in get_products():
         fish_attributes = position['attributes']
         fish_title = fish_attributes['title']
         fish_description = fish_attributes['description']
+        print(fish_title, fish_description)
+
         keyboard.append([InlineKeyboardButton(fish_title, callback_data=position['id'])])
+
+
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -82,29 +80,40 @@ def echo(update, context):
     #users_reply = update.message.text
     #update.message.reply_text(users_reply)
     query = update.callback_query
-    fish_attributes = get_product(query.data)['attributes']
-    fish_description = fish_attributes['description']
-    query.edit_message_text(text=fish_description)
-    # query = update.callback_query
-    # description = get_product(query.data)
-
-    # keyboard = []
-
-    # for position in get_products():
-        # fish_attributes = position['attributes']
-        # fish_title = fish_attributes['title']
-        # fish_description = fish_attributes['description']
-
-        # keyboard.append([InlineKeyboardButton(fish_title, callback_data=position['id'])])
-
-    # reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # update.message.reply_text(description, reply_markup=reply_markup)
-
+    text = query.data
+    query.edit_message_text(text=text)
     return 'ECHO'
 
 
-def handle_users_reply(update, context):
+def handle_menu(update, context):
+    """
+    Хэндлер для состояния ECHO.
+
+    Бот отвечает пользователю тем же, что пользователь ему написал.
+    Оставляет пользователя в состоянии ECHO.
+    """
+    query = update.callback_query
+    text = query.data
+    query.edit_message_text(text=text)
+    keyboard = []
+
+    for position in get_products():
+        fish_attributes = position['attributes']
+        fish_title = fish_attributes['title']
+        fish_description = fish_attributes['description']
+        print(fish_title, fish_description)
+
+        keyboard.append([InlineKeyboardButton(fish_title, callback_data=position['id'])])
+
+        fish_attributes = get_products(query.data)['attributes']
+        fish_description = fish_attributes['description']
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text(fish_description, reply_markup=reply_markup)
+    return 'ECHO'
+
+
+def handle_users_reply(update, context, db):
     """
     Функция, которая запускается при любом сообщении от пользователя и решает как его обработать.
     Эта функция запускается в ответ на эти действия пользователя:
@@ -117,7 +126,6 @@ def handle_users_reply(update, context):
     поэтому по этой фразе выставляется стартовое состояние.
     Если пользователь захочет начать общение с ботом заново, он также может воспользоваться этой командой.
     """
-    db = get_database_connection()
     if update.message:
         user_reply = update.message.text
         chat_id = update.message.chat_id
@@ -133,7 +141,8 @@ def handle_users_reply(update, context):
 
     states_functions = {
         'START': start,
-        'ECHO': echo
+        'ECHO': echo,
+        'HANDLE_MENU': handle_menu
     }
     state_handler = states_functions[user_state]
     # Если вы вдруг не заметите, что python-telegram-bot перехватывает ошибки.
@@ -145,26 +154,23 @@ def handle_users_reply(update, context):
     except Exception as err:
         print(err)
 
-def get_database_connection():
-    """
-    Возвращает конекшн с базой данных Redis, либо создаёт новый, если он ещё не создан.
-    """
-    global _database
-    if _database is None:
-        database_host = os.getenv('DATABASE_HOST')
-        database_port = os.getenv('DATABASE_PORT')
-        _database = Redis(host=database_host, port=database_port, decode_responses=True)
-    return _database
 
-
-if __name__ == '__main__':
+def main():
     env = Env()
     env.read_env()
     tg_token = env.str('TELEGRAM_TOKEN')
+    database_host = env.str('DATABASE_HOST')
+    database_port = env.str('DATABASE_PORT')
     updater = Updater(tg_token)
     dispatcher = updater.dispatcher
-    dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
-    dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
-    dispatcher.add_handler(CommandHandler('start', handle_users_reply))
+    dbase = Redis(host=database_host, port=database_port, decode_responses=True)
+    handle_users_reply_with_db = partial(handle_users_reply, db=dbase)
+    dispatcher.add_handler(CallbackQueryHandler(handle_users_reply_with_db))
+    dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply_with_db))
+    dispatcher.add_handler(CommandHandler('start', handle_users_reply_with_db))
     updater.start_polling()
     updater.idle()
+
+
+if __name__ == '__main__':
+    main()
