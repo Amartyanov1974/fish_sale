@@ -28,7 +28,7 @@ from telegram.ext import (
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(funcName)s - %(message)s',
-    level=logging.INFO,
+    level=logging.DEBUG,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ def start(update, context):
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    update.message.reply_text('Please choose:', reply_markup=reply_markup)
+    update.message.reply_text('Выберите продукт:', reply_markup=reply_markup)
     return 'HANDLE_MENU'
 
 
@@ -92,14 +92,14 @@ def handle_menu(update, context):
     Хэндлер для состояния handle_menu.
 
     Бот отвечает пользователю тем же, что пользователь ему написал.
-    Оставляет пользователя в состоянии handle_menu.
+    Оставляет пользователя в состоянии handle_decription.
     """
 
     query = update.callback_query
-    print(query.message.message_id)
+    print(query.message)
     fish_attributes = get_product(query.data)['attributes']
     fish_description = fish_attributes['description']
-    keyboard = [[InlineKeyboardButton('Вернуться', callback_data='Cancel')],]
+    keyboard = [[InlineKeyboardButton('Вернуться', callback_data='handle_decription')],]
     chat_id=update.effective_chat.id
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
@@ -109,26 +109,24 @@ def handle_menu(update, context):
 
 def handle_decription(update, context):
     """
-    Хэндлер для состояния handle_menu.
+    Хэндлер для состояния handle_decription.
 
     Бот отвечает пользователю тем же, что пользователь ему написал.
     Оставляет пользователя в состоянии handle_menu.
     """
-    #users_reply = update.message.text
-    #update.message.reply_text(users_reply)
     query = update.callback_query
-    print(query.message.message_id)
-    fish_attributes = get_product(query.data)['attributes']
-    fish_description = fish_attributes['description']
-    keyboard = [[InlineKeyboardButton('Вернуться', callback_data='Cancel')],]
-    chat_id=update.effective_chat.id
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
-    context.bot.send_photo(chat_id, get_avatar_product(query.data), caption=fish_description, reply_markup=reply_markup)
+    keyboard = []
 
-    # query.answer()
-    # query.edit_message_text(text=fish_description, reply_markup=reply_markup)
-    # query.edit_message_text(text=fish_description)
+    for position in get_products():
+        fish_attributes = position['attributes']
+        fish_title = fish_attributes['title']
+        fish_description = fish_attributes['description']
+        keyboard.append([InlineKeyboardButton(fish_title, callback_data=position['id'])])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    chat_id=update.effective_chat.id
+    context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
+    context.bot.send_message(chat_id, text='Выберите продукт:', reply_markup=reply_markup)
     return 'HANDLE_MENU'
 
 
