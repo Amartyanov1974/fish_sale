@@ -9,6 +9,9 @@ import logging
 import requests
 from redis import Redis
 from environs import Env
+from urllib.parse import urljoin
+from io import BytesIO
+from pprint import pprint
 
 
 from telegram import (
@@ -51,12 +54,24 @@ def get_product(product_id):
     return response.json()['data']
 
 
+def get_avatar_product(product_id):
+    strapi_token = os.getenv('API_TOKEN_FISH')
+    url = f'http://localhost:1337/api/products/{product_id}?populate=picture'
+    payload = {'Authorization': f'bearer {strapi_token}'}
+    response = requests.get(url, headers=payload)
+    response.raise_for_status()
+    url = response.json()['data']['attributes']['picture']['data'][0]['attributes']['url']
+    url = urljoin('http://localhost:1337/', url)
+    response = requests.get(url)
+    return BytesIO(response.content)
+
+
 def start(update, context):
     """
     Хэндлер для состояния START.
 
-    Бот отвечает пользователю фразой "Привет!" и переводит его в состояние ECHO.
-    Теперь в ответ на его команды будет запускаеться хэндлер echo.
+    Бот отвечает пользователю фразой "Привет!" и переводит его в состояние HANDLE_MENU.
+    Теперь в ответ на его команды будет запускаеться хэндлер handle_menu.
     """
     keyboard = []
 
@@ -69,39 +84,54 @@ def start(update, context):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     update.message.reply_text('Please choose:', reply_markup=reply_markup)
-    return 'ECHO'
+    return 'HANDLE_MENU'
 
 
-def echo(update, context):
+def handle_menu(update, context):
     """
-    Хэндлер для состояния ECHO.
+    Хэндлер для состояния handle_menu.
 
     Бот отвечает пользователю тем же, что пользователь ему написал.
-    Оставляет пользователя в состоянии ECHO.
+    Оставляет пользователя в состоянии handle_menu.
+    """
+
+    query = update.callback_query
+    print(query.message.message_id)
+    fish_attributes = get_product(query.data)['attributes']
+    fish_description = fish_attributes['description']
+    keyboard = [[InlineKeyboardButton('Вернуться', callback_data='Cancel')],]
+    chat_id=update.effective_chat.id
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
+    context.bot.send_photo(chat_id, get_avatar_product(query.data), caption=fish_description, reply_markup=reply_markup)
+    return 'HANDLE_DESCRIPTION'
+
+
+def handle_decription(update, context):
+    """
+    Хэндлер для состояния handle_menu.
+
+    Бот отвечает пользователю тем же, что пользователь ему написал.
+    Оставляет пользователя в состоянии handle_menu.
     """
     #users_reply = update.message.text
     #update.message.reply_text(users_reply)
     query = update.callback_query
+    print(query.message.message_id)
     fish_attributes = get_product(query.data)['attributes']
     fish_description = fish_attributes['description']
-    query.edit_message_text(text=fish_description)
-    # query = update.callback_query
-    # description = get_product(query.data)
+    keyboard = [[InlineKeyboardButton('Вернуться', callback_data='Cancel')],]
+    chat_id=update.effective_chat.id
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
+    context.bot.send_photo(chat_id, get_avatar_product(query.data), caption=fish_description, reply_markup=reply_markup)
 
-    # keyboard = []
+    # query.answer()
+    # query.edit_message_text(text=fish_description, reply_markup=reply_markup)
+    # query.edit_message_text(text=fish_description)
+    return 'HANDLE_MENU'
 
-    # for position in get_products():
-        # fish_attributes = position['attributes']
-        # fish_title = fish_attributes['title']
-        # fish_description = fish_attributes['description']
 
-        # keyboard.append([InlineKeyboardButton(fish_title, callback_data=position['id'])])
-
-    # reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # update.message.reply_text(description, reply_markup=reply_markup)
-
-    return 'ECHO'
 
 
 def handle_users_reply(update, context):
@@ -133,9 +163,11 @@ def handle_users_reply(update, context):
 
     states_functions = {
         'START': start,
-        'ECHO': echo
+        'HANDLE_MENU': handle_menu,
+        'HANDLE_DESCRIPTION': handle_decription
     }
     state_handler = states_functions[user_state]
+
     # Если вы вдруг не заметите, что python-telegram-bot перехватывает ошибки.
     # Оставляю этот try...except, чтобы код не падал молча.
     # Этот фрагмент можно переписать.
