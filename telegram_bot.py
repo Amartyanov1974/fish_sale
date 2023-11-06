@@ -5,6 +5,7 @@ python-telegram-bot==13.15
 redis==3.2.1
 """
 import os
+import json
 import logging
 import requests
 from redis import Redis
@@ -28,12 +29,52 @@ from telegram.ext import (
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(funcName)s - %(message)s',
-    level=logging.DEBUG,
+    level=logging.INFO,
 )
 
 logger = logging.getLogger(__name__)
 
 _database = None
+
+
+def delete_entry():
+    strapi_token = os.getenv('API_TOKEN_FISH')
+    url = f'http://localhost:1337/api/item-positions/1'
+    payload = {'Authorization': f'bearer {strapi_token}'}
+    response = requests.delete(url, headers=payload)
+    response.raise_for_status()
+    print (response.json()['data'])
+
+
+def update_entry(chat_id):
+    strapi_token = os.getenv('API_TOKEN_FISH')
+    url = f'http://localhost:1337/api/carts/6'
+    payload = {'Authorization': f'bearer {strapi_token}'}
+    data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": None}}
+    # data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": 1}}
+    # data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": [1, 2]}}
+    response = requests.put(url, json=data, headers=payload)
+    response.raise_for_status()
+    print (response.json()['data'])
+
+
+def create_entry(chat_id):
+    strapi_token = os.getenv('API_TOKEN_FISH')
+    url = f'http://localhost:1337/api/carts'
+    payload = {'Authorization': f'bearer {strapi_token}'}
+    data =  {"data": {"telegram_user_id": str(chat_id)}}
+    response = requests.post(url, json=data, headers=payload)
+    response.raise_for_status()
+    print (response.json()['data'])
+
+
+def get_entry(chat_id):
+    strapi_token = os.getenv('API_TOKEN_FISH')
+    url = f'http://localhost:1337/api/carts?filters[telegram_user_id][$eq]={chat_id}'
+    payload = {'Authorization': f'bearer {strapi_token}'}
+    response = requests.get(url, headers=payload)
+    response.raise_for_status()
+    print (response.json()['data'])
 
 
 def get_products():
@@ -96,10 +137,10 @@ def handle_menu(update, context):
     """
 
     query = update.callback_query
-    print(query.message)
     fish_attributes = get_product(query.data)['attributes']
     fish_description = fish_attributes['description']
-    keyboard = [[InlineKeyboardButton('Вернуться', callback_data='handle_decription')],]
+    keyboard = [[InlineKeyboardButton('Вернуться', callback_data='handle_decription'),
+                 InlineKeyboardButton('Добавить в корзину', callback_data='create_basket')],]
     chat_id=update.effective_chat.id
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
@@ -111,10 +152,16 @@ def handle_decription(update, context):
     """
     Хэндлер для состояния handle_decription.
 
-    Бот отвечает пользователю тем же, что пользователь ему написал.
     Оставляет пользователя в состоянии handle_menu.
     """
+    chat_id = update.effective_chat.id
     query = update.callback_query
+
+    if query.data == 'create_basket':
+        delete_entry()
+        # if not get_entry(chat_id):
+            # create_entry(chat_id)
+
     keyboard = []
 
     for position in get_products():
@@ -124,7 +171,6 @@ def handle_decription(update, context):
         keyboard.append([InlineKeyboardButton(fish_title, callback_data=position['id'])])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    chat_id=update.effective_chat.id
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
     context.bot.send_message(chat_id, text='Выберите продукт:', reply_markup=reply_markup)
     return 'HANDLE_MENU'
