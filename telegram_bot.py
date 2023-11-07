@@ -37,6 +37,26 @@ logger = logging.getLogger(__name__)
 _database = None
 
 
+def get_item_positions():
+    strapi_token = os.getenv('API_TOKEN_FISH')
+    url = f'http://localhost:1337/api/item-positions/18?populate=*'
+    payload = {'Authorization': f'bearer {strapi_token}'}
+    response = requests.get(url, headers=payload)
+    response.raise_for_status()
+    print (response.json()['data'])
+    return response.json()['data']
+
+
+def get_carts():
+    strapi_token = os.getenv('API_TOKEN_FISH')
+    url = f'http://localhost:1337/api/carts/9?populate=*'
+    payload = {'Authorization': f'bearer {strapi_token}'}
+    response = requests.get(url, headers=payload)
+    response.raise_for_status()
+    print (response.json()['data'])
+    return response.json()['data']
+
+
 def delete_entry():
     strapi_token = os.getenv('API_TOKEN_FISH')
     url = f'http://localhost:1337/api/item-positions/1'
@@ -46,26 +66,37 @@ def delete_entry():
     print (response.json()['data'])
 
 
-def update_entry(chat_id):
+def update_entry(cart_id, chat_id, item_positions_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/carts/6'
+    url = f'http://localhost:1337/api/carts/{cart_id}'
     payload = {'Authorization': f'bearer {strapi_token}'}
-    data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": None}}
-    # data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": 1}}
-    # data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": [1, 2]}}
+    data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": {"connect": [item_positions_id]}}}
     response = requests.put(url, json=data, headers=payload)
     response.raise_for_status()
     print (response.json()['data'])
+    return response.json()['data']
 
 
-def create_entry(chat_id):
+def create_item_positions(fish_id, quantity=1):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/carts'
+    url = f'http://localhost:1337/api/item-positions'
     payload = {'Authorization': f'bearer {strapi_token}'}
-    data =  {"data": {"telegram_user_id": str(chat_id)}}
+    data =  {"data": {"product": fish_id, "quantity": quantity,}}
     response = requests.post(url, json=data, headers=payload)
     response.raise_for_status()
     print (response.json()['data'])
+    return response.json()['data']
+
+
+def create_entry(chat_id, item_positions_id):
+    strapi_token = os.getenv('API_TOKEN_FISH')
+    url = f'http://localhost:1337/api/carts'
+    payload = {'Authorization': f'bearer {strapi_token}'}
+    data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": item_positions_id}}
+    response = requests.post(url, json=data, headers=payload)
+    response.raise_for_status()
+    print (response.json()['data'])
+    return response.json()['data']
 
 
 def get_entry(chat_id):
@@ -75,6 +106,7 @@ def get_entry(chat_id):
     response = requests.get(url, headers=payload)
     response.raise_for_status()
     print (response.json()['data'])
+    return response.json()['data']
 
 
 def get_products():
@@ -137,10 +169,11 @@ def handle_menu(update, context):
     """
 
     query = update.callback_query
+    print(query.data)
     fish_attributes = get_product(query.data)['attributes']
     fish_description = fish_attributes['description']
     keyboard = [[InlineKeyboardButton('Вернуться', callback_data='handle_decription'),
-                 InlineKeyboardButton('Добавить в корзину', callback_data='create_basket')],]
+                 InlineKeyboardButton('Добавить в корзину', callback_data=f'create_basket {query.data}')],]
     chat_id=update.effective_chat.id
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
@@ -156,11 +189,32 @@ def handle_decription(update, context):
     """
     chat_id = update.effective_chat.id
     query = update.callback_query
+    answer = query.data.split()
+    print(answer)
 
-    if query.data == 'create_basket':
-        delete_entry()
-        # if not get_entry(chat_id):
-            # create_entry(chat_id)
+
+    if answer[0] == 'create_basket':
+
+
+        fish_id = answer[1]
+        item_positions_id = create_item_positions(fish_id)['id']
+        print(item_positions_id)
+        cart = get_entry(chat_id)
+        if not cart:
+            cart = [create_entry(chat_id, item_positions_id),]
+        else:
+            cart_id = cart[0]['id']
+            cart = update_entry(cart_id, chat_id, item_positions_id)
+        print()
+        get_carts()
+        """{'id': 9, 'attributes': {'createdAt': '2023-11-07T18:25:38.057Z', 'updatedAt': '2023-11-07T19:34:23.237Z', 'publishedAt': '2023-11-07T18:25:38.054Z', 'telegram_user_id': '411157618', 'item_positions': {'data': [{'id': 18, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T18:50:16.226Z', 'updatedAt': '2023-11-07T18:50:16.226Z', 'publishedAt': '2023-11-07T18:50:16.223Z'}}, {'id': 19, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T19:02:41.660Z', 'updatedAt': '2023-11-07T19:02:41.660Z', 'publishedAt': '2023-11-07T19:02:41.653Z'}}, {'id': 20, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T19:03:46.003Z', 'updatedAt': '2023-11-07T19:03:46.003Z', 'publishedAt': '2023-11-07T19:03:45.997Z'}}, {'id': 21, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T19:09:37.640Z', 'updatedAt': '2023-11-07T19:09:37.640Z', 'publishedAt': '2023-11-07T19:09:37.635Z'}}, {'id': 22, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T19:30:52.778Z', 'updatedAt': '2023-11-07T19:30:52.778Z', 'publishedAt': '2023-11-07T19:30:52.771Z'}}, {'id': 23, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T19:34:22.989Z', 'updatedAt': '2023-11-07T19:34:22.989Z', 'publishedAt': '2023-11-07T19:34:22.984Z'}}]}, 'users_permissions_user': {'data': None}}}"""
+
+        print()
+        get_item_positions()
+        """{'id': 18, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T18:50:16.226Z', 'updatedAt': '2023-11-07T18:50:16.226Z', 'publishedAt': '2023-11-07T18:50:16.223Z', 'cart': {'data': {'id': 9, 'attributes': {'createdAt': '2023-11-07T18:25:38.057Z', 'updatedAt': '2023-11-07T19:34:23.237Z', 'publishedAt': '2023-11-07T18:25:38.054Z', 'telegram_user_id': '411157618'}}}, 'product': {'data': {'id': 5, 'attributes': {'title': 'Дикий лосось', 'description': 'Дикий лосось "Стейк рыбацкий" с/м 600г', 'price': 420, 'createdAt': '2023-10-14T12:26:09.175Z', 'updatedAt': '2023-10-14T20:02:12.907Z', 'publishedAt': '2023-10-14T12:26:39.622Z'}}}}}"""
+
+
+
 
     keyboard = []
 
