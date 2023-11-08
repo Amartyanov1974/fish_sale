@@ -47,16 +47,6 @@ def get_item_positions():
     return response.json()['data']
 
 
-def get_carts():
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/carts/9?populate=*'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, headers=payload)
-    response.raise_for_status()
-    # print (response.json()['data'])
-    return response.json()['data']
-
-
 def get_all_products_cart(cart_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
     url = f'http://localhost:1337/api/carts/{cart_id}?populate[item_positions][populate]=product'
@@ -64,22 +54,27 @@ def get_all_products_cart(cart_id):
     response = requests.get(url, headers=payload)
     response.raise_for_status()
     products = response.json()['data']['attributes']['item_positions']['data']
-    in_cart = ''
+    # in_cart = ''
+    cart =[]
     for product in products:
-        product_quantity = product['attributes']['quantity']
-        product_title = product['attributes']['product']['data']['attributes']['title']
-        product_price = product['attributes']['product']['data']['attributes']['price']
-        in_cart = f'{in_cart} \n{product_title}. Цена за единицу товара: {product_price}. Количество товара: {product_quantity}'
-    return in_cart
+        # pprint(json.dumps(product['attributes'], ensure_ascii=False, indent=2))
+        cart.append(product)
+        # product_quantity = product['attributes']['quantity']
+        # product_title = product['attributes']['product']['data']['attributes']['title']
+        # product_price = product['attributes']['product']['data']['attributes']['price']
+        # in_cart = f'{in_cart} \n{product_title}. Цена за единицу товара: {product_price}. Количество товара: {product_quantity}'
+    pprint(cart)
+    return cart
 
 
-def delete_entry():
+def delete_item_positions(item_positions_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/item-positions/1'
+    url = f'http://localhost:1337/api/item-positions/{item_positions_id}'
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.delete(url, headers=payload)
     response.raise_for_status()
-    print (response.json()['data'])
+    print ('delete_item_positions', response.json()['data'])
+    print()
     return response.json()['data']
 
 
@@ -90,7 +85,8 @@ def update_entry(cart_id, chat_id, item_positions_id):
     data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": {"connect": [item_positions_id]}}}
     response = requests.put(url, json=data, headers=payload)
     response.raise_for_status()
-    # print (response.json()['data'])
+    print ('update_entry', response.json()['data'])
+    print()
     return response.json()['data']
 
 
@@ -101,7 +97,8 @@ def create_item_positions(fish_id, quantity=1):
     data =  {"data": {"product": fish_id, "quantity": quantity,}}
     response = requests.post(url, json=data, headers=payload)
     response.raise_for_status()
-    # print (response.json()['data'])
+    print ('create_item_positions', response.json()['data'])
+    print()
     return response.json()['data']
 
 
@@ -112,7 +109,8 @@ def create_entry(chat_id, item_positions_id):
     data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": item_positions_id}}
     response = requests.post(url, json=data, headers=payload)
     response.raise_for_status()
-    # print (response.json()['data'])
+    print ('create_entry', response.json()['data'])
+    print()
     return response.json()['data']
 
 
@@ -122,7 +120,8 @@ def get_entry(chat_id):
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, headers=payload)
     response.raise_for_status()
-    # print (response.json()['data'])
+    print ('get_entry', response.json()['data'])
+    print()
     return response.json()['data']
 
 
@@ -132,6 +131,8 @@ def get_products():
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, headers=payload)
     response.raise_for_status()
+    print ('get_products', response.json()['data'])
+    print()
     return response.json()['data']
 
 
@@ -141,6 +142,8 @@ def get_product(product_id):
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, headers=payload)
     response.raise_for_status()
+    print ('get_product', response.json()['data'])
+    print()
     return response.json()['data']
 
 
@@ -160,16 +163,14 @@ def start(update, context):
     """
     Хэндлер для состояния START.
 
-    Бот отвечает пользователю фразой "Привет!" и переводит его в состояние HANDLE_MENU.
-    Теперь в ответ на его команды будет запускаеться хэндлер handle_menu.
     """
     keyboard = []
 
-    for position in get_products():
-        fish_attributes = position['attributes']
-        fish_title = fish_attributes['title']
-        fish_description = fish_attributes['description']
-        keyboard.append([InlineKeyboardButton(fish_title, callback_data=position['id'])])
+    for product in get_products():
+        product_title = product['attributes']['title']
+        product_description = product['attributes']['description']
+        product_id = product['id']
+        keyboard.append([InlineKeyboardButton(product_title, callback_data=product_id)])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -177,12 +178,38 @@ def start(update, context):
     return 'HANDLE_MENU'
 
 
+def handle_cart(update, context):
+    pass
+    # """
+    # Хэндлер для состояния HANDLE_CART.
+
+    # """
+    # keyboard = []
+    # cart = get_entry(chat_id)
+    # in_cart = ''
+    # if cart:
+        # cart_id = cart[0]['id']
+        # products_cart = get_all_products_cart(cart_id)
+        # for product in products_cart:
+            # product_quantity = product['attributes']['quantity']
+            # product_title = product['attributes']['product']['data']['attributes']['title']
+            # product_price = product['attributes']['product']['data']['attributes']['price']
+            # product_id = product['id']
+            # in_cart = f'{in_cart} \n{product_title}. Цена за единицу товара: {product_price}. Количество товара: {product_quantity}'
+            # keyboard.append([InlineKeyboardButton(f'Удалить {product_title}', callback_data=f'delete_product {product_id}')])
+        # text = in_cart
+        # keyboard.append([InlineKeyboardButton('Вернуться', callback_data='return_menu'),])
+    # else:
+        # text = 'Корзина пуста'
+        # keyboard = [[InlineKeyboardButton('Вернуться', callback_data='return_menu')],]
+    # reply_markup = InlineKeyboardMarkup(keyboard)
+    # context.bot.send_message(chat_id, text=text, reply_markup=reply_markup)
+    # return 'HANDLE_MENU'
+
 def handle_menu(update, context):
     """
     Хэндлер для состояния handle_menu.
 
-    Бот отвечает пользователю тем же, что пользователь ему написал.
-    Оставляет пользователя в состоянии handle_decription.
     """
     chat_id = update.effective_chat.id
     query = update.callback_query
@@ -191,23 +218,34 @@ def handle_menu(update, context):
     answer = query.data
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
     if answer == 'basket':
+        keyboard = []
         cart = get_entry(chat_id)
+        in_cart = ''
         if cart:
             cart_id = cart[0]['id']
-            text = get_all_products_cart(cart_id)
+            products_cart = get_all_products_cart(cart_id)
+            for product in products_cart:
+                product_quantity = product['attributes']['quantity']
+                product_title = product['attributes']['product']['data']['attributes']['title']
+                product_price = product['attributes']['product']['data']['attributes']['price']
+                product_id = product['id']
+                in_cart = f'{in_cart} \n{product_title}. Цена за единицу товара: {product_price}. Количество товара: {product_quantity}'
+                keyboard.append([InlineKeyboardButton(f'Удалить {product_title}', callback_data=f'delete_product {product_id}')])
+            text = in_cart
+            keyboard.append([InlineKeyboardButton('Вернуться', callback_data='return_menu'),])
         else:
             text = 'Корзина пуста'
-        keyboard = [[InlineKeyboardButton('Вернуться', callback_data='return_menu')],]
+            keyboard = [[InlineKeyboardButton('Вернуться', callback_data='return_menu')],]
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.send_message(chat_id, text=text, reply_markup=reply_markup)
+        # return 'HANDLE_CART'
 
 
     else:
-        fish_attributes = get_product(query.data)['attributes']
-        fish_description = fish_attributes['description']
+        product_description = get_product(query.data)['attributes']['description']
         keyboard = [[InlineKeyboardButton('Вернуться', callback_data='return_menu'),
                      InlineKeyboardButton('Добавить в корзину', callback_data=f'create_basket {query.data}')],]
-        text = fish_description
+        text = product_description
 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -225,15 +263,12 @@ def handle_decription(update, context):
     query = update.callback_query
     answer = query.data.split()
     print(answer)
-
+    cart = get_entry(chat_id)
 
     if answer[0] == 'create_basket':
-
-
-        fish_id = answer[1]
-        item_positions_id = create_item_positions(fish_id)['id']
-        print(item_positions_id)
-        cart = get_entry(chat_id)
+        product_id = answer[1]
+        item_positions_id = create_item_positions(product_id)['id']
+        print('item_positions_id=', item_positions_id)
         if not cart:
             cart = [create_entry(chat_id, item_positions_id),]
         else:
@@ -241,24 +276,23 @@ def handle_decription(update, context):
             cart = update_entry(cart_id, chat_id, item_positions_id)
     # elif answer[0] == 'return_menu':
         # get_all_products_cart()
-
-
+    if answer[0] == 'delete_product':
+        item_positions_id = answer[1]
+        delete_item_positions(item_positions_id)
 
     keyboard = []
 
-    for position in get_products():
-        fish_attributes = position['attributes']
-        fish_title = fish_attributes['title']
-        fish_description = fish_attributes['description']
-        keyboard.append([InlineKeyboardButton(fish_title, callback_data=position['id'])])
+    for product in get_products():
+        product_title = product['attributes']['title']
+        product_description = product['attributes']['description']
+        product_id = product['id']
+        keyboard.append([InlineKeyboardButton(product_title, callback_data=product_id)])
     keyboard.append([InlineKeyboardButton('Корзина', callback_data='basket')])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
     context.bot.send_message(chat_id, text='Выберите продукт:', reply_markup=reply_markup)
     return 'HANDLE_MENU'
-
-
 
 
 def handle_users_reply(update, context):
@@ -291,7 +325,8 @@ def handle_users_reply(update, context):
     states_functions = {
         'START': start,
         'HANDLE_MENU': handle_menu,
-        'HANDLE_DESCRIPTION': handle_decription
+        'HANDLE_DESCRIPTION': handle_decription,
+        'HANDLE_CART': handle_cart
     }
     state_handler = states_functions[user_state]
 
@@ -303,6 +338,7 @@ def handle_users_reply(update, context):
         db.set(chat_id, next_state)
     except Exception as err:
         print(err)
+
 
 def get_database_connection():
     """
@@ -316,7 +352,7 @@ def get_database_connection():
     return _database
 
 
-if __name__ == '__main__':
+def main():
     env = Env()
     env.read_env()
     tg_token = env.str('TELEGRAM_TOKEN')
@@ -327,3 +363,7 @@ if __name__ == '__main__':
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
     updater.start_polling()
     updater.idle()
+
+
+if __name__ == '__main__':
+    main()
