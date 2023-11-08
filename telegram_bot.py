@@ -43,7 +43,7 @@ def get_item_positions():
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, headers=payload)
     response.raise_for_status()
-    print (response.json()['data'])
+    # print (response.json()['data'])
     return response.json()['data']
 
 
@@ -53,8 +53,24 @@ def get_carts():
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, headers=payload)
     response.raise_for_status()
-    print (response.json()['data'])
+    # print (response.json()['data'])
     return response.json()['data']
+
+
+def get_all_products_cart(cart_id):
+    strapi_token = os.getenv('API_TOKEN_FISH')
+    url = f'http://localhost:1337/api/carts/{cart_id}?populate[item_positions][populate]=product'
+    payload = {'Authorization': f'bearer {strapi_token}'}
+    response = requests.get(url, headers=payload)
+    response.raise_for_status()
+    products = response.json()['data']['attributes']['item_positions']['data']
+    in_cart = ''
+    for product in products:
+        product_quantity = product['attributes']['quantity']
+        product_title = product['attributes']['product']['data']['attributes']['title']
+        product_price = product['attributes']['product']['data']['attributes']['price']
+        in_cart = f'{in_cart} \n{product_title}. Цена за единицу товара: {product_price}. Количество товара: {product_quantity}'
+    return in_cart
 
 
 def delete_entry():
@@ -64,6 +80,7 @@ def delete_entry():
     response = requests.delete(url, headers=payload)
     response.raise_for_status()
     print (response.json()['data'])
+    return response.json()['data']
 
 
 def update_entry(cart_id, chat_id, item_positions_id):
@@ -73,7 +90,7 @@ def update_entry(cart_id, chat_id, item_positions_id):
     data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": {"connect": [item_positions_id]}}}
     response = requests.put(url, json=data, headers=payload)
     response.raise_for_status()
-    print (response.json()['data'])
+    # print (response.json()['data'])
     return response.json()['data']
 
 
@@ -84,7 +101,7 @@ def create_item_positions(fish_id, quantity=1):
     data =  {"data": {"product": fish_id, "quantity": quantity,}}
     response = requests.post(url, json=data, headers=payload)
     response.raise_for_status()
-    print (response.json()['data'])
+    # print (response.json()['data'])
     return response.json()['data']
 
 
@@ -95,7 +112,7 @@ def create_entry(chat_id, item_positions_id):
     data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": item_positions_id}}
     response = requests.post(url, json=data, headers=payload)
     response.raise_for_status()
-    print (response.json()['data'])
+    # print (response.json()['data'])
     return response.json()['data']
 
 
@@ -105,7 +122,7 @@ def get_entry(chat_id):
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, headers=payload)
     response.raise_for_status()
-    print (response.json()['data'])
+    # print (response.json()['data'])
     return response.json()['data']
 
 
@@ -167,17 +184,34 @@ def handle_menu(update, context):
     Бот отвечает пользователю тем же, что пользователь ему написал.
     Оставляет пользователя в состоянии handle_decription.
     """
-
+    chat_id = update.effective_chat.id
     query = update.callback_query
     print(query.data)
-    fish_attributes = get_product(query.data)['attributes']
-    fish_description = fish_attributes['description']
-    keyboard = [[InlineKeyboardButton('Вернуться', callback_data='handle_decription'),
-                 InlineKeyboardButton('Добавить в корзину', callback_data=f'create_basket {query.data}')],]
-    chat_id=update.effective_chat.id
-    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    answer = query.data
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
-    context.bot.send_photo(chat_id, get_avatar_product(query.data), caption=fish_description, reply_markup=reply_markup)
+    if answer == 'basket':
+        cart = get_entry(chat_id)
+        if cart:
+            cart_id = cart[0]['id']
+            text = get_all_products_cart(cart_id)
+        else:
+            text = 'Корзина пуста'
+        keyboard = [[InlineKeyboardButton('Вернуться', callback_data='return_menu')],]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.send_message(chat_id, text=text, reply_markup=reply_markup)
+
+
+    else:
+        fish_attributes = get_product(query.data)['attributes']
+        fish_description = fish_attributes['description']
+        keyboard = [[InlineKeyboardButton('Вернуться', callback_data='return_menu'),
+                     InlineKeyboardButton('Добавить в корзину', callback_data=f'create_basket {query.data}')],]
+        text = fish_description
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        context.bot.send_photo(chat_id, get_avatar_product(query.data), caption=text, reply_markup=reply_markup)
     return 'HANDLE_DESCRIPTION'
 
 
@@ -205,14 +239,8 @@ def handle_decription(update, context):
         else:
             cart_id = cart[0]['id']
             cart = update_entry(cart_id, chat_id, item_positions_id)
-        print()
-        get_carts()
-        """{'id': 9, 'attributes': {'createdAt': '2023-11-07T18:25:38.057Z', 'updatedAt': '2023-11-07T19:34:23.237Z', 'publishedAt': '2023-11-07T18:25:38.054Z', 'telegram_user_id': '411157618', 'item_positions': {'data': [{'id': 18, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T18:50:16.226Z', 'updatedAt': '2023-11-07T18:50:16.226Z', 'publishedAt': '2023-11-07T18:50:16.223Z'}}, {'id': 19, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T19:02:41.660Z', 'updatedAt': '2023-11-07T19:02:41.660Z', 'publishedAt': '2023-11-07T19:02:41.653Z'}}, {'id': 20, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T19:03:46.003Z', 'updatedAt': '2023-11-07T19:03:46.003Z', 'publishedAt': '2023-11-07T19:03:45.997Z'}}, {'id': 21, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T19:09:37.640Z', 'updatedAt': '2023-11-07T19:09:37.640Z', 'publishedAt': '2023-11-07T19:09:37.635Z'}}, {'id': 22, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T19:30:52.778Z', 'updatedAt': '2023-11-07T19:30:52.778Z', 'publishedAt': '2023-11-07T19:30:52.771Z'}}, {'id': 23, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T19:34:22.989Z', 'updatedAt': '2023-11-07T19:34:22.989Z', 'publishedAt': '2023-11-07T19:34:22.984Z'}}]}, 'users_permissions_user': {'data': None}}}"""
-
-        print()
-        get_item_positions()
-        """{'id': 18, 'attributes': {'quantity': 1, 'createdAt': '2023-11-07T18:50:16.226Z', 'updatedAt': '2023-11-07T18:50:16.226Z', 'publishedAt': '2023-11-07T18:50:16.223Z', 'cart': {'data': {'id': 9, 'attributes': {'createdAt': '2023-11-07T18:25:38.057Z', 'updatedAt': '2023-11-07T19:34:23.237Z', 'publishedAt': '2023-11-07T18:25:38.054Z', 'telegram_user_id': '411157618'}}}, 'product': {'data': {'id': 5, 'attributes': {'title': 'Дикий лосось', 'description': 'Дикий лосось "Стейк рыбацкий" с/м 600г', 'price': 420, 'createdAt': '2023-10-14T12:26:09.175Z', 'updatedAt': '2023-10-14T20:02:12.907Z', 'publishedAt': '2023-10-14T12:26:39.622Z'}}}}}"""
-
+    # elif answer[0] == 'return_menu':
+        # get_all_products_cart()
 
 
 
@@ -223,6 +251,7 @@ def handle_decription(update, context):
         fish_title = fish_attributes['title']
         fish_description = fish_attributes['description']
         keyboard.append([InlineKeyboardButton(fish_title, callback_data=position['id'])])
+    keyboard.append([InlineKeyboardButton('Корзина', callback_data='basket')])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
