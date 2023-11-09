@@ -1,19 +1,13 @@
-"""
-Работает с этими модулями:
-
-python-telegram-bot==13.15
-redis==3.2.1
-"""
 import os
 import json
 import logging
 import requests
-from redis import Redis
-from environs import Env
 from urllib.parse import urljoin
 from io import BytesIO
-from pprint import pprint
 
+from email_validator import validate_email, EmailNotValidError
+from environs import Env
+from redis import Redis
 
 from telegram import (
     InlineKeyboardButton,
@@ -37,16 +31,6 @@ logger = logging.getLogger(__name__)
 _database = None
 
 
-def get_item_positions():
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/item-positions/18?populate=*'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, headers=payload)
-    response.raise_for_status()
-    # print (response.json()['data'])
-    return response.json()['data']
-
-
 def get_all_products_cart(cart_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
     url = f'http://localhost:1337/api/carts/{cart_id}?populate[item_positions][populate]=product'
@@ -54,16 +38,9 @@ def get_all_products_cart(cart_id):
     response = requests.get(url, headers=payload)
     response.raise_for_status()
     products = response.json()['data']['attributes']['item_positions']['data']
-    # in_cart = ''
     cart =[]
     for product in products:
-        # pprint(json.dumps(product['attributes'], ensure_ascii=False, indent=2))
         cart.append(product)
-        # product_quantity = product['attributes']['quantity']
-        # product_title = product['attributes']['product']['data']['attributes']['title']
-        # product_price = product['attributes']['product']['data']['attributes']['price']
-        # in_cart = f'{in_cart} \n{product_title}. Цена за единицу товара: {product_price}. Количество товара: {product_quantity}'
-    pprint(cart)
     return cart
 
 
@@ -73,55 +50,44 @@ def delete_item_positions(item_positions_id):
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.delete(url, headers=payload)
     response.raise_for_status()
-    print ('delete_item_positions', response.json()['data'])
-    print()
     return response.json()['data']
 
 
-def update_entry(cart_id, chat_id, item_positions_id):
+def update_cart(cart_id, chat_id, item_positions_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
     url = f'http://localhost:1337/api/carts/{cart_id}'
     payload = {'Authorization': f'bearer {strapi_token}'}
     data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": {"connect": [item_positions_id]}}}
     response = requests.put(url, json=data, headers=payload)
     response.raise_for_status()
-    print ('update_entry', response.json()['data'])
-    print()
-    return response.json()['data']
 
 
-def create_item_positions(fish_id, quantity=1):
+def create_item_positions(product_id, quantity=1):
     strapi_token = os.getenv('API_TOKEN_FISH')
     url = f'http://localhost:1337/api/item-positions'
     payload = {'Authorization': f'bearer {strapi_token}'}
-    data =  {"data": {"product": fish_id, "quantity": quantity,}}
+    data =  {"data": {"product": product_id, "quantity": quantity,}}
     response = requests.post(url, json=data, headers=payload)
     response.raise_for_status()
-    print ('create_item_positions', response.json()['data'])
-    print()
     return response.json()['data']
 
 
-def create_entry(chat_id, item_positions_id):
+def create_cart(chat_id, item_positions_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
     url = f'http://localhost:1337/api/carts'
     payload = {'Authorization': f'bearer {strapi_token}'}
     data =  {"data": {"telegram_user_id": str(chat_id), "item_positions": item_positions_id}}
     response = requests.post(url, json=data, headers=payload)
     response.raise_for_status()
-    print ('create_entry', response.json()['data'])
-    print()
     return response.json()['data']
 
 
-def get_entry(chat_id):
+def get_cart(chat_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
     url = f'http://localhost:1337/api/carts?filters[telegram_user_id][$eq]={chat_id}'
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, headers=payload)
     response.raise_for_status()
-    print ('get_entry', response.json()['data'])
-    print()
     return response.json()['data']
 
 
@@ -131,8 +97,6 @@ def get_products():
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, headers=payload)
     response.raise_for_status()
-    print ('get_products', response.json()['data'])
-    print()
     return response.json()['data']
 
 
@@ -142,8 +106,6 @@ def get_product(product_id):
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, headers=payload)
     response.raise_for_status()
-    print ('get_product', response.json()['data'])
-    print()
     return response.json()['data']
 
 
@@ -159,71 +121,75 @@ def get_avatar_product(product_id):
     return BytesIO(response.content)
 
 
+def check_email(email):
+    value = validate_email(email)
+    email = value["email"]
+
+
 def start(update, context):
-    """
-    Хэндлер для состояния START.
+    keyboard = [[InlineKeyboardButton('Войти', callback_data='handle_menu')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text('Телеграм-магазин по продаже рыбы', reply_markup=reply_markup)
+    return 'START'
 
-    """
+
+def handle_menu(update, context):
+    chat_id = update.effective_chat.id
+    query = update.callback_query
+    answer = query.data.split()
+    cart = get_cart(chat_id)
     keyboard = []
-
     for product in get_products():
         product_title = product['attributes']['title']
         product_description = product['attributes']['description']
         product_id = product['id']
-        keyboard.append([InlineKeyboardButton(product_title, callback_data=product_id)])
-
+        keyboard.append([InlineKeyboardButton(product_title, callback_data=f'description {product_id}')])
+    keyboard.append([InlineKeyboardButton('Корзина', callback_data='cart')])
+    message_id=query.message.message_id
     reply_markup = InlineKeyboardMarkup(keyboard)
-
-    update.message.reply_text('Выберите продукт:', reply_markup=reply_markup)
+    context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+    context.bot.send_message(chat_id, text='Выберите продукт:', reply_markup=reply_markup)
     return 'HANDLE_MENU'
 
 
-def handle_cart(update, context):
-    pass
-    # """
-    # Хэндлер для состояния HANDLE_CART.
-
-    # """
-    # keyboard = []
-    # cart = get_entry(chat_id)
-    # in_cart = ''
-    # if cart:
-        # cart_id = cart[0]['id']
-        # products_cart = get_all_products_cart(cart_id)
-        # for product in products_cart:
-            # product_quantity = product['attributes']['quantity']
-            # product_title = product['attributes']['product']['data']['attributes']['title']
-            # product_price = product['attributes']['product']['data']['attributes']['price']
-            # product_id = product['id']
-            # in_cart = f'{in_cart} \n{product_title}. Цена за единицу товара: {product_price}. Количество товара: {product_quantity}'
-            # keyboard.append([InlineKeyboardButton(f'Удалить {product_title}', callback_data=f'delete_product {product_id}')])
-        # text = in_cart
-        # keyboard.append([InlineKeyboardButton('Вернуться', callback_data='return_menu'),])
-    # else:
-        # text = 'Корзина пуста'
-        # keyboard = [[InlineKeyboardButton('Вернуться', callback_data='return_menu')],]
-    # reply_markup = InlineKeyboardMarkup(keyboard)
-    # context.bot.send_message(chat_id, text=text, reply_markup=reply_markup)
-    # return 'HANDLE_MENU'
-
-def handle_menu(update, context):
-    """
-    Хэндлер для состояния handle_menu.
-
-    """
+def handle_decription(update, context):
     chat_id = update.effective_chat.id
     query = update.callback_query
-    print(query.data)
+    answer = query.data.split()
+    message_id=query.message.message_id
+    product_description = get_product(answer[1])['attributes']['description']
+    keyboard = [[InlineKeyboardButton('Вернуться  в меню', callback_data='handle_menu'),
+                 InlineKeyboardButton('Добавить в корзину', callback_data=f'add_product {answer[1]}')],]
+    text = product_description
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+    context.bot.send_photo(chat_id, get_avatar_product(answer[1]), caption=text, reply_markup=reply_markup)
+    return 'HANDLE_DESCRIPTION'
 
-    answer = query.data
-    context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
-    if answer == 'basket':
-        keyboard = []
-        cart = get_entry(chat_id)
-        in_cart = ''
-        if cart:
+
+def handle_cart(update, context):
+    chat_id = update.effective_chat.id
+    query = update.callback_query
+    answer = query.data.split()
+    cart = get_cart(chat_id)
+    if answer[0] == 'delete_product':
+        item_positions_id = answer[1]
+        delete_item_positions(item_positions_id)
+    elif answer[0] == 'add_product':
+        product_id = answer[1]
+        item_positions_id = create_item_positions(product_id)['id']
+        if not cart:
+            cart = [create_cart(chat_id, item_positions_id),]
+        else:
             cart_id = cart[0]['id']
-            products_cart = get_all_products_cart(cart_id)
+            update_cart(cart_id, chat_id, item_positions_id)
+    message_id=query.message.message_id
+    keyboard = []
+    in_cart = ''
+    if cart:
+        cart_id = cart[0]['id']
+        products_cart = get_all_products_cart(cart_id)
+        if products_cart:
             for product in products_cart:
                 product_quantity = product['attributes']['quantity']
                 product_title = product['attributes']['product']['data']['attributes']['title']
@@ -232,67 +198,45 @@ def handle_menu(update, context):
                 in_cart = f'{in_cart} \n{product_title}. Цена за единицу товара: {product_price}. Количество товара: {product_quantity}'
                 keyboard.append([InlineKeyboardButton(f'Удалить {product_title}', callback_data=f'delete_product {product_id}')])
             text = in_cart
-            keyboard.append([InlineKeyboardButton('Вернуться', callback_data='return_menu'),])
+            keyboard.append([InlineKeyboardButton('Вернуться в меню', callback_data='handle_menu'),
+                             InlineKeyboardButton('Оплатить', callback_data='handle_user_email'),])
         else:
             text = 'Корзина пуста'
-            keyboard = [[InlineKeyboardButton('Вернуться', callback_data='return_menu')],]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        context.bot.send_message(chat_id, text=text, reply_markup=reply_markup)
-        # return 'HANDLE_CART'
-
-
+            keyboard = [[InlineKeyboardButton('Вернуться в меню', callback_data='handle_menu')],]
     else:
-        product_description = get_product(query.data)['attributes']['description']
-        keyboard = [[InlineKeyboardButton('Вернуться', callback_data='return_menu'),
-                     InlineKeyboardButton('Добавить в корзину', callback_data=f'create_basket {query.data}')],]
-        text = product_description
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        context.bot.send_photo(chat_id, get_avatar_product(query.data), caption=text, reply_markup=reply_markup)
-    return 'HANDLE_DESCRIPTION'
+        text = 'Корзина пуста'
+        keyboard = [[InlineKeyboardButton('Вернуться в меню', callback_data='handle_menu')],]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+    context.bot.send_message(chat_id, text=text, reply_markup=reply_markup)
+    return 'HANDLE_CART'
 
 
-def handle_decription(update, context):
-    """
-    Хэндлер для состояния handle_decription.
-
-    Оставляет пользователя в состоянии handle_menu.
-    """
+def handle_user_email(update, context):
     chat_id = update.effective_chat.id
     query = update.callback_query
-    answer = query.data.split()
-    print(answer)
-    cart = get_entry(chat_id)
+    if query:
+        message_id=query.message.message_id
+        context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        keyboard = [[InlineKeyboardButton('Вернуться в корзину', callback_data='cart')],]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.send_message(chat_id, text='В ответном сообщении введите ваш e-mail:', reply_markup=reply_markup)
+    else:
+        email = update.message.text
+        try:
+            check_email(email)
+            keyboard = [[InlineKeyboardButton('Подтвердить', callback_data='handle_menu')],]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            context.bot.send_message(chat_id, text=f'Ваш e-mail: {email}',reply_markup=reply_markup)
+        except EmailNotValidError:
+            message_id=update.message.message_id
+            keyboard = [[InlineKeyboardButton('Вернуться в корзину', callback_data='cart')],]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+            context.bot.send_message(chat_id, text='Ошибка e-mail.\n В ответном сообщении введите ваш e-mail:', reply_markup=reply_markup)
 
-    if answer[0] == 'create_basket':
-        product_id = answer[1]
-        item_positions_id = create_item_positions(product_id)['id']
-        print('item_positions_id=', item_positions_id)
-        if not cart:
-            cart = [create_entry(chat_id, item_positions_id),]
-        else:
-            cart_id = cart[0]['id']
-            cart = update_entry(cart_id, chat_id, item_positions_id)
-    # elif answer[0] == 'return_menu':
-        # get_all_products_cart()
-    if answer[0] == 'delete_product':
-        item_positions_id = answer[1]
-        delete_item_positions(item_positions_id)
-
-    keyboard = []
-
-    for product in get_products():
-        product_title = product['attributes']['title']
-        product_description = product['attributes']['description']
-        product_id = product['id']
-        keyboard.append([InlineKeyboardButton(product_title, callback_data=product_id)])
-    keyboard.append([InlineKeyboardButton('Корзина', callback_data='basket')])
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
-    context.bot.send_message(chat_id, text='Выберите продукт:', reply_markup=reply_markup)
-    return 'HANDLE_MENU'
+        print(update.message.chat.username)
+    return 'HANDLE_USER_EMAIL'
 
 
 def handle_users_reply(update, context):
@@ -313,20 +257,31 @@ def handle_users_reply(update, context):
         user_reply = update.message.text
         chat_id = update.message.chat_id
     elif update.callback_query:
-        user_reply = update.callback_query.data
+        user_reply = update.callback_query.data.split()[0]
         chat_id = update.callback_query.message.chat_id
     else:
         return
     if user_reply == '/start':
         user_state = 'START'
+    elif user_reply == 'handle_menu':
+        user_state = 'HANDLE_MENU'
+    elif user_reply == 'description':
+        user_state = 'HANDLE_DESCRIPTION'
+    elif user_reply in ['cart', 'add_product', 'delete_product']:
+        user_state = 'HANDLE_CART'
+    elif user_reply == 'handle_user_email':
+        user_state = 'HANDLE_USER_EMAIL'
     else:
+        print(update)
         user_state = db.get(chat_id)
-
+    print(user_state)
     states_functions = {
         'START': start,
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_decription,
-        'HANDLE_CART': handle_cart
+        'HANDLE_CART': handle_cart,
+        'HANDLE_USER_EMAIL': handle_user_email,
+
     }
     state_handler = states_functions[user_state]
 
