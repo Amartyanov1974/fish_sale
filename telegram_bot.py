@@ -28,7 +28,7 @@ _database = None
 
 def get_all_products_cart(cart_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    params = {'populate[item_positions][populate]':'product'}
+    params = {'populate[item_positions][populate]': 'product'}
     url = f'http://localhost:1337/api/carts/{cart_id}'
     payload = {'Authorization': f'bearer {strapi_token}'}
     response = requests.get(url, params=params, headers=payload)
@@ -184,9 +184,9 @@ def handle_menu(update, context):
                      callback_data='cart')])
     message_id = query.message.message_id
     reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     context.bot.send_message(chat_id, text='Выберите продукт:',
                              reply_markup=reply_markup)
+    context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     return 'HANDLE_MENU'
 
 
@@ -202,9 +202,9 @@ def handle_decription(update, context):
         ]]
     text = product_description
     reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     context.bot.send_photo(chat_id, get_avatar_product(answer[1]),
                            caption=text, reply_markup=reply_markup)
+    context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     return 'HANDLE_DESCRIPTION'
 
 
@@ -255,8 +255,8 @@ def handle_cart(update, context):
         keyboard = [[InlineKeyboardButton('Вернуться в меню',
                                           callback_data='handle_menu')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     context.bot.send_message(chat_id, text=text, reply_markup=reply_markup)
+    context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     return 'HANDLE_CART'
 
 
@@ -265,10 +265,12 @@ def handle_user_email(update, context):
     query = update.callback_query
     if query:
         message_id = query.message.message_id
-        context.bot.delete_message(chat_id=chat_id, message_id=message_id)
         keyboard = [[InlineKeyboardButton('Вернуться в корзину', callback_data='cart')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        context.bot.send_message(chat_id, text='В ответном сообщении введите ваш e-mail:', reply_markup=reply_markup)
+        context.bot.send_message(chat_id,
+                                 text='В ответном сообщении введите ваш e-mail:',
+                                 reply_markup=reply_markup)
+        context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     else:
         email = update.message.text
         try:
@@ -276,21 +278,20 @@ def handle_user_email(update, context):
             keyboard = [[InlineKeyboardButton('Подтвердить',
                          callback_data='handle_menu')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            context.bot.send_message(chat_id, text=f'Ваш e-mail: {email}', reply_markup=reply_markup)
+            context.bot.send_message(chat_id,
+                                     text=f'Ваш e-mail: {email}',
+                                     reply_markup=reply_markup)
         except EmailNotValidError:
             message_id = update.message.message_id
             keyboard = [[InlineKeyboardButton('Вернуться в корзину',
                                               callback_data='cart')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            context.bot.delete_message(
-                chat_id=chat_id,
-                message_id=message_id
-                )
             context.bot.send_message(
                 chat_id,
                 text='Ошибка e-mail.\n В ответном сообщении введите ваш e-mail:',
                 reply_markup=reply_markup
                 )
+            context.bot.delete_message(chat_id=chat_id, message_id=message_id)
         client = get_client(chat_id)[0]
         client_id = client['id']
         update_client(client_id, email)
@@ -360,7 +361,9 @@ def get_database_connection():
     if _database is None:
         database_host = os.getenv('DATABASE_HOST')
         database_port = os.getenv('DATABASE_PORT')
-        _database = Redis(host=database_host, port=database_port, decode_responses=True)
+        _database = Redis(host=database_host,
+                         port=database_port,
+                         decode_responses=True)
     return _database
 
 
