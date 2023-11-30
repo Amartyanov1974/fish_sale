@@ -21,11 +21,6 @@ from telegram.ext import (
     )
 
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(funcName)s - %(message)s',
-    level=logging.INFO,
-)
-
 logger = logging.getLogger(__name__)
 
 _database = None
@@ -366,10 +361,20 @@ def get_database_connection():
 
 
 def main():
+    loglevel = 'INFO'
+    logger = logging.getLogger(__name__)
+    logger.setLevel(loglevel)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(loglevel)
+    formatter = logging.Formatter('%(asctime)s - %(funcName)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
     env = Env()
     env.read_env()
     tg_token = env.str('TELEGRAM_TOKEN')
+
     updater = Updater(tg_token)
+
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
