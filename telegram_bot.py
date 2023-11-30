@@ -61,7 +61,7 @@ def update_cart(cart_id, chat_id, item_positions_id):
 
 def create_item_positions(product_id, quantity=1):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/item-positions'
+    url = 'http://localhost:1337/api/item-positions'
     payload = {'Authorization': f'bearer {strapi_token}'}
     data = {"data": {"product": product_id, "quantity": quantity}}
     response = requests.post(url, json=data, headers=payload)
@@ -71,7 +71,7 @@ def create_item_positions(product_id, quantity=1):
 
 def create_cart(chat_id, item_positions_id, client_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/carts'
+    url = 'http://localhost:1337/api/carts'
     payload = {'Authorization': f'bearer {strapi_token}'}
     data = {"data": {"telegram_user_id": str(chat_id),
                      "item_positions": item_positions_id,
@@ -83,7 +83,7 @@ def create_cart(chat_id, item_positions_id, client_id):
 
 def create_client(username, chat_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/clients'
+    url = 'http://localhost:1337/api/clients'
     payload = {'Authorization': f'bearer {strapi_token}'}
     data = {"data": {"telegram_id": str(chat_id), "username": username}}
     response = requests.post(url, json=data, headers=payload)
@@ -93,9 +93,10 @@ def create_client(username, chat_id):
 
 def get_client(chat_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/clients?filters[telegram_id][$eq]={chat_id}'
+    params = {'filters[telegram_id][$eq]': f'{chat_id}'}
+    url = 'http://localhost:1337/api/clients'
     payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, headers=payload)
+    response = requests.get(url, params=params, headers=payload)
     response.raise_for_status()
     return response.json()['data']
 
@@ -111,9 +112,10 @@ def update_client(client_id, email):
 
 def get_cart(chat_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/carts?filters[telegram_user_id][$eq]={chat_id}'
+    params = {'filters[telegram_user_id][$eq]': f'{chat_id}'}
+    url = 'http://localhost:1337/api/carts'
     payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, headers=payload)
+    response = requests.get(url, params=params, headers=payload)
     response.raise_for_status()
     return response.json()['data']
 
@@ -138,9 +140,10 @@ def get_product(product_id):
 
 def get_avatar_product(product_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/products/{product_id}?populate=picture'
+    params = {'populate': 'picture'}
+    url = f'http://localhost:1337/api/products/{product_id}'
     payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, headers=payload)
+    response = requests.get(url, params=params, headers=payload)
     response.raise_for_status()
     url = response.json()['data']['attributes']['picture']['data'][0]['attributes']['url']
     url = urljoin('http://localhost:1337/', url)
