@@ -28,9 +28,10 @@ _database = None
 
 def get_all_products_cart(cart_id):
     strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/carts/{cart_id}?populate[item_positions][populate]=product'
+    params = {'populate[item_positions][populate]':'product'}
+    url = f'http://localhost:1337/api/carts/{cart_id}'
     payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, headers=payload)
+    response = requests.get(url, params=params, headers=payload)
     response.raise_for_status()
     products = response.json()['data']['attributes']['item_positions']['data']
     cart = []
