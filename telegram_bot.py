@@ -1,12 +1,7 @@
 import os
-import json
 import logging
-import requests
-from urllib.parse import urljoin
-from io import BytesIO
 
 from email_validator import validate_email, EmailNotValidError
-from environs import Env
 from redis import Redis
 
 from telegram import (
@@ -19,136 +14,25 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     )
-
+from settings import tg_token, database_host, database_port
+from ip_functions import(
+    get_all_products_cart,
+    delete_item_positions,
+    update_cart,
+    create_item_positions,
+    create_cart,
+    create_client,
+    get_client,
+    update_client,
+    get_cart,
+    get_products,
+    get_product,
+    get_avatar_product
+    )
 
 logger = logging.getLogger(__name__)
 
 _database = None
-
-
-def get_all_products_cart(cart_id):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    params = {'populate[item_positions][populate]': 'product'}
-    url = f'http://localhost:1337/api/carts/{cart_id}'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, params=params, headers=payload)
-    response.raise_for_status()
-    products = response.json()['data']['attributes']['item_positions']['data']
-    cart = []
-    for product in products:
-        cart.append(product)
-    return cart
-
-
-def delete_item_positions(item_positions_id):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/item-positions/{item_positions_id}'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.delete(url, headers=payload)
-    response.raise_for_status()
-    return response.json()['data']
-
-
-def update_cart(cart_id, chat_id, item_positions_id):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/carts/{cart_id}'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    data = {"data": {"telegram_user_id": str(chat_id),
-                     "item_positions": {"connect": [item_positions_id]}}}
-    response = requests.put(url, json=data, headers=payload)
-    response.raise_for_status()
-
-
-def create_item_positions(product_id, quantity=1):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    url = 'http://localhost:1337/api/item-positions'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    data = {"data": {"product": product_id, "quantity": quantity}}
-    response = requests.post(url, json=data, headers=payload)
-    response.raise_for_status()
-    return response.json()['data']
-
-
-def create_cart(chat_id, item_positions_id, client_id):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    url = 'http://localhost:1337/api/carts'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    data = {"data": {"telegram_user_id": str(chat_id),
-                     "item_positions": item_positions_id,
-                     "client": {"connect": [client_id]}}}
-    response = requests.post(url, json=data, headers=payload)
-    response.raise_for_status()
-    return response.json()['data']
-
-
-def create_client(username, chat_id):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    url = 'http://localhost:1337/api/clients'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    data = {"data": {"telegram_id": str(chat_id), "username": username}}
-    response = requests.post(url, json=data, headers=payload)
-    response.raise_for_status()
-    return response.json()['data']
-
-
-def get_client(chat_id):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    params = {'filters[telegram_id][$eq]': f'{chat_id}'}
-    url = 'http://localhost:1337/api/clients'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, params=params, headers=payload)
-    response.raise_for_status()
-    return response.json()['data']
-
-
-def update_client(client_id, email):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/clients/{client_id}'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    data = {"data": {"email": str(email)}}
-    response = requests.put(url, json=data, headers=payload)
-    response.raise_for_status()
-
-
-def get_cart(chat_id):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    params = {'filters[telegram_user_id][$eq]': f'{chat_id}'}
-    url = 'http://localhost:1337/api/carts'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, params=params, headers=payload)
-    response.raise_for_status()
-    return response.json()['data']
-
-
-def get_products():
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    url = 'http://localhost:1337/api/products'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, headers=payload)
-    response.raise_for_status()
-    return response.json()['data']
-
-
-def get_product(product_id):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    url = f'http://localhost:1337/api/products/{product_id}'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, headers=payload)
-    response.raise_for_status()
-    return response.json()['data']
-
-
-def get_avatar_product(product_id):
-    strapi_token = os.getenv('API_TOKEN_FISH')
-    params = {'populate': 'picture'}
-    url = f'http://localhost:1337/api/products/{product_id}'
-    payload = {'Authorization': f'bearer {strapi_token}'}
-    response = requests.get(url, params=params, headers=payload)
-    response.raise_for_status()
-    url = response.json()['data']['attributes']['picture']['data'][0]['attributes']['url']
-    url = urljoin('http://localhost:1337/', url)
-    response = requests.get(url)
-    return BytesIO(response.content)
 
 
 def check_email(email):
@@ -193,16 +77,16 @@ def handle_menu(update, context):
 def handle_decription(update, context):
     chat_id = update.effective_chat.id
     query = update.callback_query
-    _, value_id = query.data.split()
+    _, product_id = query.data.split()
     message_id = query.message.message_id
-    product_description = get_product(value_id)['attributes']['description']
+    product_description = get_product(product_id)['attributes']['description']
     keyboard = [[
         InlineKeyboardButton('Вернуться  в меню', callback_data='handle_menu'),
-        InlineKeyboardButton('Добавить в корзину', callback_data=f'add_product {value_id}')
+        InlineKeyboardButton('Добавить в корзину', callback_data=f'add_product {product_id}')
         ]]
     text = product_description
     reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.send_photo(chat_id, get_avatar_product(value_id),
+    context.bot.send_photo(chat_id, get_avatar_product(product_id),
                            caption=text, reply_markup=reply_markup)
     context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     return 'HANDLE_DESCRIPTION'
@@ -310,6 +194,7 @@ def handle_users_reply(update, context):
     поэтому по этой фразе выставляется стартовое состояние.
     Если пользователь захочет начать общение с ботом заново, он также может воспользоваться этой командой.
     """
+
     db = get_database_connection()
     if update.message:
         user_reply = update.message.text
@@ -352,13 +237,8 @@ def handle_users_reply(update, context):
 
 
 def get_database_connection():
-    """
-    Возвращает конекшн с базой данных Redis, либо создаёт новый, если он ещё не создан.
-    """
     global _database
     if _database is None:
-        database_host = os.getenv('DATABASE_HOST')
-        database_port = os.getenv('DATABASE_PORT')
         _database = Redis(host=database_host,
                          port=database_port,
                          decode_responses=True)
@@ -374,12 +254,8 @@ def main():
     formatter = logging.Formatter('%(asctime)s - %(funcName)s - %(message)s')
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
-    env = Env()
-    env.read_env()
-    tg_token = env.str('TELEGRAM_TOKEN')
 
     updater = Updater(tg_token)
-
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
