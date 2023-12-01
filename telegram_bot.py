@@ -181,7 +181,7 @@ def handle_menu(update, context):
         keyboard.append([InlineKeyboardButton(product_title,
                          callback_data=f'description {product_id}')])
     keyboard.append([InlineKeyboardButton('Корзина',
-                     callback_data='cart')])
+                     callback_data='cart 0')])
     message_id = query.message.message_id
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_message(chat_id, text='Выберите продукт:',
@@ -193,16 +193,16 @@ def handle_menu(update, context):
 def handle_decription(update, context):
     chat_id = update.effective_chat.id
     query = update.callback_query
-    answer = query.data.split()
+    _, value_id = query.data.split()
     message_id = query.message.message_id
-    product_description = get_product(answer[1])['attributes']['description']
+    product_description = get_product(value_id)['attributes']['description']
     keyboard = [[
         InlineKeyboardButton('Вернуться  в меню', callback_data='handle_menu'),
-        InlineKeyboardButton('Добавить в корзину', callback_data=f'add_product {answer[1]}')
+        InlineKeyboardButton('Добавить в корзину', callback_data=f'add_product {value_id}')
         ]]
     text = product_description
     reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.send_photo(chat_id, get_avatar_product(answer[1]),
+    context.bot.send_photo(chat_id, get_avatar_product(value_id),
                            caption=text, reply_markup=reply_markup)
     context.bot.delete_message(chat_id=chat_id, message_id=message_id)
     return 'HANDLE_DESCRIPTION'
@@ -211,14 +211,12 @@ def handle_decription(update, context):
 def handle_cart(update, context):
     chat_id = update.effective_chat.id
     query = update.callback_query
-    answer = query.data.split()
+    action, value_id = query.data.split()
     cart = get_cart(chat_id)
-    if answer[0] == 'delete_product':
-        item_positions_id = answer[1]
-        delete_item_positions(item_positions_id)
-    elif answer[0] == 'add_product':
-        product_id = answer[1]
-        item_positions_id = create_item_positions(product_id)['id']
+    if action == 'delete_product':
+        delete_item_positions(value_id)
+    elif action == 'add_product':
+        item_positions_id = create_item_positions(value_id)['id']
         if not cart:
             client = get_client(chat_id)[0]
             client_id = client['id']
@@ -265,7 +263,7 @@ def handle_user_email(update, context):
     query = update.callback_query
     if query:
         message_id = query.message.message_id
-        keyboard = [[InlineKeyboardButton('Вернуться в корзину', callback_data='cart')]]
+        keyboard = [[InlineKeyboardButton('Вернуться в корзину', callback_data='cart 0')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.send_message(chat_id,
                                  text='В ответном сообщении введите ваш e-mail:',
@@ -284,7 +282,7 @@ def handle_user_email(update, context):
         except EmailNotValidError:
             message_id = update.message.message_id
             keyboard = [[InlineKeyboardButton('Вернуться в корзину',
-                                              callback_data='cart')]]
+                                              callback_data='cart 0')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             context.bot.send_message(
                 chat_id,
