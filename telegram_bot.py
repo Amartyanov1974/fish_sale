@@ -228,7 +228,7 @@ def handle_users_reply(update, context):
 
     try:
         next_state = state_handler(update, context)
-        print(next_state)
+        logger.info(f'user_state: {next_state}')
         db.set(chat_id, next_state)
     except Exception as err:
         print(err)
