@@ -17,11 +17,10 @@ configfile = args.config
 config.read(configfile)
 
 base_url = config['Base']['url']
+database_host = config['REDIS']['DATABASE_HOST']
+database_port = config['REDIS']['DATABASE_PORT']
 
 env = Env()
 env.read_env()
+strapi_token = env.str('STRAPI_API_TOKEN')
 tg_token = env.str('TELEGRAM_TOKEN')
-
-strapi_token = env.str('API_TOKEN_FISH')
-database_host = env.str('DATABASE_HOST')
-database_port = env.int('DATABASE_PORT')
