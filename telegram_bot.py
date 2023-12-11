@@ -51,7 +51,10 @@ def start(update, context):
 def handle_menu(update, context):
     chat_id = update.effective_chat.id
     query = update.callback_query
-    answer = query.data.split()
+    if query:
+        message_id = query.message.message_id
+    else:
+        message_id = update.message.message_id
     cart = get_cart(chat_id)
     keyboard = []
     username = update.effective_chat.username
@@ -66,12 +69,12 @@ def handle_menu(update, context):
                          callback_data=f'description {product_id}')])
     keyboard.append([InlineKeyboardButton('Корзина',
                      callback_data='cart 0')])
-    message_id = query.message.message_id
+
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_message(chat_id, text='Выберите продукт:',
                              reply_markup=reply_markup)
     context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-    return 'HANDLE_MENU'
+    return 'HANDLE_DESCRIPTION'
 
 
 def handle_decription(update, context):
@@ -89,7 +92,7 @@ def handle_decription(update, context):
     context.bot.send_photo(chat_id, get_avatar_product(product_id),
                            caption=text, reply_markup=reply_markup)
     context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-    return 'HANDLE_DESCRIPTION'
+    return 'HANDLE_MENU'
 
 
 def handle_cart(update, context):
@@ -139,7 +142,7 @@ def handle_cart(update, context):
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_message(chat_id, text=text, reply_markup=reply_markup)
     context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-    return 'HANDLE_CART'
+    return 'HANDLE_MENU'
 
 
 def handle_user_email(update, context):
@@ -206,12 +209,10 @@ def handle_users_reply(update, context):
         return
     if user_reply == '/start':
         user_state = 'START'
-    elif user_reply == 'handle_menu':
-        user_state = 'HANDLE_MENU'
-    elif user_reply == 'description':
-        user_state = 'HANDLE_DESCRIPTION'
     elif user_reply in ['cart', 'add_product', 'delete_product']:
         user_state = 'HANDLE_CART'
+    elif user_reply == 'handle_menu':
+        user_state = 'HANDLE_MENU'
     elif user_reply == 'handle_user_email':
         user_state = 'HANDLE_USER_EMAIL'
     else:
