@@ -5,7 +5,8 @@ from environs import Env
 
 def read_args():
     parser = argparse.ArgumentParser(description='Телеграм-магазин по продаже рыбы')
-    parser.add_argument('-config', type=str, default='settings.ini', help='Имя файла настроек')
+    parser.add_argument('-c', '--config', type=str, default='settings.ini',
+                        help='Имя файла настроек (default=settings.ini)')
     args = parser.parse_args()
     return args
 
