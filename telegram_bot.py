@@ -45,7 +45,7 @@ def start(update, context):
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text('Телеграм-магазин по продаже рыбы',
                               reply_markup=reply_markup)
-    return 'START'
+    return 'HANDLE_MENU'
 
 
 def handle_menu(update, context):
@@ -222,15 +222,12 @@ def handle_users_reply(update, context):
         'HANDLE_DESCRIPTION': handle_decription,
         'HANDLE_CART': handle_cart,
         'HANDLE_USER_EMAIL': handle_user_email,
-
     }
     state_handler = states_functions[user_state]
 
-    # Если вы вдруг не заметите, что python-telegram-bot перехватывает ошибки.
-    # Оставляю этот try...except, чтобы код не падал молча.
-    # Этот фрагмент можно переписать.
     try:
         next_state = state_handler(update, context)
+        print(next_state)
         db.set(chat_id, next_state)
     except Exception as err:
         print(err)
