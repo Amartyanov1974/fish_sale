@@ -2,7 +2,6 @@
 ## Описание проекта
 Для работы необходимо установить [CMS Strapi](https://strapi.io/)
 
-Получить Strapi API Token
 
 
 ## Примеры работы программы
@@ -18,11 +17,34 @@
 ![Снимок экрана_2023-11-10_16-02-34](https://github.com/Amartyanov1974/fish_sale/assets/74543172/303db0fd-bd62-420c-8493-79e83316e1b3)<br>
 
 
+## Переменные окружения
+Для работы бота необходимы следующие переменные окружения:
 
+`STRAPI_API_TOKEN` - токен, для работы с API STRAPI.<br>
+`TELEGRAM_TOKEN` - токен для телеграм бота, получить здесь: https://t.me/BotFather.
 
+## Файл конфигурации
+По умолчанию используется файл конфигурации `settings.ini`<br>
+
+`[Base]`<br>
+`url: http://localhost:1337/` - адрес размещения CMS STRAPI.<br>
+`[REDIS]`<br>
+`DATABASE_HOST: localhost` - адрес размещения базы REDIS<br>
+`DATABASE_PORT: 6379` - порт для подключения к REDIS<br>
+
+## Запуск бота
+```
+usage: telegram_bot.py [-h] [-config CONFIG]
+
+Телеграм-магазин по продаже рыбы
+
+options:
+  -h, --help      show this help message and exit
+  -c, --config CONFIG  Имя файла настроек (default=settings.ini)
+```
 
 ## Как установить
-Python3 должен быть установлен. Затем используйте `pip` (или `pip3`, если есть конфликт с Python2) для установки зависимостей:
+Python3 должен быть установлен. Затем используйте `pip` для установки зависимостей:
 ```
 pip install -r requirements.txt
 ```
