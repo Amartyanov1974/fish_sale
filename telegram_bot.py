@@ -15,7 +15,7 @@ from telegram.ext import (
     MessageHandler,
     )
 from settings import tg_token, database_host, database_port
-from strapi_ip import(
+from strapi_api import(
     get_all_products_cart,
     delete_item_positions,
     update_cart,
